@@ -35,7 +35,7 @@ public class DicomToXml {
 	public static void main(final String[] args) {
 		try {
 			final File outputFolder = createEmptyDirectory("/home/ronish/DevTools/Temp/out1");
-			final File inputDicomFile = new File("/home/ronish/DevTools/Temp/color-symbol.dcm");
+			final File inputDicomFile = new File("/home/ronish/DevTools/Temp/pdf-1.dcm");
 			final String filePrefix = getOutputFileNamePrefix(inputDicomFile);
 			createXMLFromDICOMFile(inputDicomFile, outputFolder, filePrefix);
 			createJPEGFromDICOMFile(inputDicomFile, outputFolder, filePrefix);
@@ -77,10 +77,13 @@ public class DicomToXml {
 			try {
 				bufferedImage = imageReader.read(counter++);
 			} catch (final IOException exp) {
-				//TODO Find a better way to exit.
+				//TODO Find a better way to exit if no more images.
 				return;
 			} catch (ConfigurationError ce) {
-				//TODO Find a better way to exit in no JPEGs.
+				//TODO Find a better way to exit if no JPEGs.
+				return;
+			} catch (ArrayIndexOutOfBoundsException aioe) {
+				//TODO Find a better way to exit if no more JPEGs.
 				return;
 			}
 			final ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(imageType).next();
