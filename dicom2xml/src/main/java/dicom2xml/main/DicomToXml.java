@@ -2,12 +2,15 @@ package dicom2xml.main;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriter;
+import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageInputStream;
 import javax.xml.transform.TransformerConfigurationException;
@@ -16,8 +19,8 @@ import javax.xml.transform.sax.SAXTransformerFactory;
 import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamResult;
 
-import org.dcm4che2.data.ConfigurationError;
 import org.dcm4che3.data.Attributes;
+import org.dcm4che3.data.Sequence;
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.io.DicomInputStream;
 import org.dcm4che3.io.SAXWriter;
@@ -39,6 +42,7 @@ public class DicomToXml {
 			final String filePrefix = getOutputFileNamePrefix(inputDicomFile);
 			createXMLFromDICOMFile(inputDicomFile, outputFolder, filePrefix);
 			createJPEGFromDICOMFile(inputDicomFile, outputFolder, filePrefix);
+			createPDFFromDICOMFile(inputDicomFile, outputFolder, filePrefix);
 		} catch (TransformerConfigurationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -62,48 +66,62 @@ public class DicomToXml {
 		dicomInputStream.setDicomInputHandler(saxWriter);
 		dicomInputStream.readDataset();
 		dicomInputStream.close();
+		System.out.println("Extracting XML is finished.");
 	}
 	
+	private static boolean containsJPEG(final File inputDCMFile) throws IOException {
+		final DicomInputStream dis = new DicomInputStream(inputDCMFile);
+		final String bla = dis.getFileMetaInformation().getString(Tag.TransferSyntaxUID);
+		dis.close();
+		return bla != null && bla.contains("1.2.840.10008.1.2.4");
+	}
+
 	public static void createJPEGFromDICOMFile(final File inputDCMFile, final File outputFolder,
 			final String outputFilePrefix) throws IOException, TransformerConfigurationException {
+		if (!containsJPEG(inputDCMFile)) {
+			System.out.println("DICOM input file doesn't contain any jpeg document.");
+			return;
+		}
 		final String imageType = "JPEG";
 		final ImageReader imageReader = ImageIO.getImageReadersByFormatName("DICOM").next();
 		final ImageInputStream imageInputStream = ImageIO.createImageInputStream(inputDCMFile);
 		imageReader.setInput(imageInputStream);
-		int counter = 0;
-		while (true) {
-
-			final BufferedImage bufferedImage;
-			try {
-				bufferedImage = imageReader.read(counter++);
-			} catch (final IOException exp) {
-				//TODO Find a better way to exit if no more images.
-				return;
-			} catch (ConfigurationError ce) {
-				//TODO Find a better way to exit if no JPEGs.
-				return;
-			} catch (ArrayIndexOutOfBoundsException aioe) {
-				//TODO Find a better way to exit if no more JPEGs.
-				return;
-			}
+		final int numberOfImages = imageReader.getNumImages(true);
+		for (int i = 0; i < numberOfImages; ++i) {
+			final BufferedImage bufferedImage = imageReader.read(i);
 			final ImageWriter imageWriter = ImageIO.getImageWritersByFormatName(imageType).next();
 			final File jpegOutputFile = new File(outputFolder,
-					String.format("%s_%s.%s", outputFilePrefix, counter, imageType));
+					String.format("%s_%s.%s", outputFilePrefix, i + 1, imageType));
 			final RandomAccessFile raf = new RandomAccessFile(jpegOutputFile, "rw");
 			raf.setLength(0);
 			final FileImageOutputStream fileImageOutputStream = new FileImageOutputStream(raf);
 			imageWriter.setOutput(fileImageOutputStream);
-			while (true) {
-				try {
-					imageWriter.write(bufferedImage);
-				} catch (Exception exp) {
-					exp.printStackTrace();
-					break;
-				}
-			}
+			imageWriter.write(bufferedImage);
 			fileImageOutputStream.close();
-			imageInputStream.close();
+			System.out.println(String.format("Extracted %s.", jpegOutputFile.getAbsolutePath()));
 		}
+		imageInputStream.close();
+		System.out.println("Extracting JPEG is finished.");
+	}
+
+	public static void createPDFFromDICOMFile(final File inputDCMFile, final File outputFolder,
+			final String outputFilePrefix) throws IOException {
+
+		DicomInputStream dis = new DicomInputStream(inputDCMFile);
+		Attributes attributes = dis.readDataset();
+		final byte[] value = (byte[]) attributes.getValue(Tag.EncapsulatedDocument);
+		if (value == null) {
+			System.out.println("DICOM input file doesn't contain any encapsulated document.");
+			dis.close();
+			return;
+		}
+		final File pdfOutputFile = new File(outputFolder, String.format("%s.%s", outputFilePrefix, "pdf"));
+		final FileOutputStream fos = new FileOutputStream(pdfOutputFile);
+		fos.write(value, 0, value.length);
+		fos.close();
+		dis.close();
+		System.out.println(String.format("Extracted %s.", pdfOutputFile.getAbsolutePath()));
+		System.out.println("Extracting PDF is finished.");
 	}
 
 	public static String getOutputFileNamePrefix(final File inputDCMFile)
