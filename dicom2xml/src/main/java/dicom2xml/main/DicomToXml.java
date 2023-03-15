@@ -43,13 +43,9 @@ public class DicomToXml {
 	 * @throws IOException
 	 * @throws TransformerConfigurationException
 	 */
-	public static void main(String[] args)
+	public static void main(final String[] args)
 			throws TransformerConfigurationException, IOException {
 
-		//args = new String[2];
-		//args[0] = "/home/ronish/DevTools/Temp/color-1.dcm";
-		//args[1] = "/home/ronish/DevTools/Temp/out1";
-		
 		validateInputs(args);
 
 		final File inputDCMFile = new File(args[0]);
