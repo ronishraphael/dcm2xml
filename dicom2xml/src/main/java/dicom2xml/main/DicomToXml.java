@@ -152,7 +152,7 @@ public class DicomToXml {
 	 * @return true if null, empty or blank, false otherwise.
 	 */
 	private static boolean isNullOrEmptyOrBlank(final String string) {
-		if (string == null || string.isEmpty() || string.isBlank()) {
+		if (string == null || string.trim().isEmpty()) {
 			return true;
 		}
 		return false;
